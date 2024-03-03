@@ -154,6 +154,7 @@ def main():
     # build the runner from config
     runner = Runner.from_cfg(cfg)
 
+    # runner.test()
     # start training
     runner.train()
 
