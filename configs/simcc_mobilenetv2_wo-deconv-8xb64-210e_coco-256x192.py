@@ -1,17 +1,6 @@
 _base_ = ['./_base_/default_runtime.py']
 
-num_keypoints = 17
-input_size = (192, 256)
-
-# runtime
-max_epochs = 700
-stage2_num_epochs = 30
-base_lr = 4e-3
-train_batch_size = 8
-val_batch_size = 8
-
-backend_args = dict(backend='local')
-
+load_from = "https://download.openmmlab.com/mmpose/v1/body_2d_keypoint/simcc/coco/simcc_mobilenetv2_wo-deconv-8xb64-210e_coco-256x192-4b0703bb_20221010.pth"
 
 # runtime
 train_cfg = dict(max_epochs=210, val_interval=1)
@@ -22,6 +11,16 @@ optim_wrapper = dict(optimizer=dict(
     lr=5e-4,
 ))
 
+num_keypoints = 17
+
+# runtime
+max_epochs = 700
+base_lr = 4e-3
+train_batch_size = 8
+val_batch_size = 8
+
+backend_args = dict(backend='local')
+
 # learning policy
 param_scheduler = [
     dict(
@@ -30,7 +29,7 @@ param_scheduler = [
     dict(
         type='MultiStepLR',
         begin=0,
-        end=210,
+        end=train_cfg['max_epochs'],
         milestones=[170, 200],
         gamma=0.1,
         by_epoch=True)
@@ -39,14 +38,9 @@ param_scheduler = [
 # automatically scaling LR based on the actual training batch size
 auto_scale_lr = dict(base_batch_size=512)
 
-# hooks
-default_hooks = dict(checkpoint=dict(save_best='coco/AP', rule='greater'))
-
 # codec settings
 codec = dict(
-    type='MSRAHeatmap', input_size=(192, 256), heatmap_size=(48, 64), sigma=2)
-
-load_from= "https://download.openmmlab.com/mmpose/v1/body_2d_keypoint/topdown_heatmap/coco/td-hm_mobilenetv2_8xb64-210e_coco-256x192-55a04c35_20221016.pth"
+    type='SimCCLabel', input_size=(192, 256), sigma=6.0, simcc_split_ratio=2.0)
 
 # model settings
 model = dict(
@@ -60,22 +54,18 @@ model = dict(
         type='MobileNetV2',
         widen_factor=1.,
         out_indices=(7, ),
-        init_cfg=dict(
-            type='Pretrained',
-            checkpoint='mmcls://mobilenet_v2',
-        )),
+        ),
     head=dict(
-        type='HeatmapHead',
+        type='SimCCHead',
         in_channels=1280,
         out_channels=17,
-        loss=dict(type='KeypointMSELoss', use_target_weight=True),
+        input_size=codec['input_size'],
+        in_featuremap_size=tuple([s // 32 for s in codec['input_size']]),
+        simcc_split_ratio=codec['simcc_split_ratio'],
+        deconv_out_channels=None,
+        loss=dict(type='KLDiscretLoss', use_target_weight=True),
         decoder=codec),
-    test_cfg=dict(
-        flip_test=True,
-        flip_mode='heatmap',
-        shift_heatmap=True,
-    ))
-
+    test_cfg=dict(flip_test=True, ))
 
 # pipelines
 train_pipeline = [
