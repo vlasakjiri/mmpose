@@ -1,7 +1,20 @@
 _base_ = ['./_base_/default_runtime.py']
 
+num_keypoints = 17
+input_size = (192, 256)
+
 # runtime
-train_cfg = dict(max_epochs=210, val_interval=10)
+max_epochs = 700
+stage2_num_epochs = 30
+base_lr = 4e-3
+train_batch_size = 8
+val_batch_size = 8
+
+backend_args = dict(backend='local')
+
+
+# runtime
+train_cfg = dict(max_epochs=210, val_interval=1)
 
 # optimizer
 optim_wrapper = dict(optimizer=dict(
@@ -33,6 +46,8 @@ default_hooks = dict(checkpoint=dict(save_best='coco/AP', rule='greater'))
 codec = dict(
     type='MSRAHeatmap', input_size=(192, 256), heatmap_size=(48, 64), sigma=2)
 
+load_from= "https://download.openmmlab.com/mmpose/v1/body_2d_keypoint/topdown_heatmap/coco/td-hm_mobilenetv2_8xb64-210e_coco-256x192-55a04c35_20221016.pth"
+
 # model settings
 model = dict(
     type='TopdownPoseEstimator',
@@ -61,64 +76,148 @@ model = dict(
         shift_heatmap=True,
     ))
 
-# base dataset settings
-dataset_type = 'CocoDataset'
-data_mode = 'topdown'
-data_root = 'data/coco/'
 
 # pipelines
 train_pipeline = [
-    dict(type='LoadImage'),
+    dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
-    dict(type='RandomFlip', direction='horizontal'),
-    dict(type='RandomHalfBody'),
-    dict(type='RandomBBoxTransform'),
+    # dict(type='RandomFlip', direction='horizontal'),
+    # dict(type='RandomHalfBody'),
+    # dict(
+    #     type='RandomBBoxTransform',
+    #     scale_factor=[1, 1.5],
+    #     rotate_factor=30,
+    #     shift_factor=0.,
+    #     # shift_prob=0,
+    #     # scale_prob=0,
+    # ),
     dict(type='TopdownAffine', input_size=codec['input_size']),
-    dict(type='GenerateTarget', encoder=codec),
+    # dict(type='PhotometricDistortion'),
+    # dict(
+    #     type='Albumentation',
+    #     transforms=[
+    #         dict(type='Blur', p=0.1),
+    #         dict(type='MedianBlur', p=0.1),
+    #         # dict(
+    #         #     type='CoarseDropout',
+    #         #     max_holes=1,
+    #         #     max_height=0.4,
+    #         #     max_width=0.4,
+    #         #     min_holes=1,
+    #         #     min_height=0.2,
+    #         #     min_width=0.2,
+    #         #     p=1.0),
+    #     ]),
+    dict(
+        type='GenerateTarget',
+        encoder=codec,
+        use_dataset_keypoint_weights=False),
     dict(type='PackPoseInputs')
 ]
 val_pipeline = [
-    dict(type='LoadImage'),
+    dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
     dict(type='TopdownAffine', input_size=codec['input_size']),
     dict(type='PackPoseInputs')
 ]
 
+
+# mapping
+halpe_halpe26 = [(i, i) for i in range(17)]
+
+coco_halpe26 = [(i, i) for i in range(17)] + [(17, 20), (18, 22), (19, 24),
+                                              (20, 21), (21, 23), (22, 25)]
+
+
+# base dataset settings
+dataset_type = 'CocoDataset'
+data_mode = 'topdown'
+data_root = 'dataset/'
+
+# train datasets
+dataset_halpe = dict(
+    type=dataset_type,
+    data_root=data_root,
+    data_mode=data_mode,
+    ann_file='annotations.json',
+    data_prefix=dict(img='img/'),
+    pipeline=[
+        dict(
+            type='KeypointConverter',
+            num_keypoints=num_keypoints,
+            mapping=halpe_halpe26)
+    ],
+)
+
+
 # data loaders
 train_dataloader = dict(
-    batch_size=64,
-    num_workers=2,
+    batch_size=train_batch_size,
+    num_workers=5,
+    pin_memory=True,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
     dataset=dict(
-        type=dataset_type,
-        data_root=data_root,
-        data_mode=data_mode,
-        ann_file='annotations/person_keypoints_train2017.json',
-        data_prefix=dict(img='train2017/'),
+        type='CombinedDataset',
+        metainfo=dict(from_file='configs/_base_/datasets/coco.py'),
+        datasets=[
+            dataset_halpe,
+        ],
         pipeline=train_pipeline,
+        test_mode=False,
     ))
+
+# val datasets
+val_halpe = dict(
+    type=dataset_type,
+    data_root=data_root,
+    data_mode=data_mode,
+    ann_file='annotations.json',
+    data_prefix=dict(img='img/'),
+    pipeline=[
+        dict(
+            type='KeypointConverter',
+            num_keypoints=num_keypoints,
+            mapping=halpe_halpe26)
+    ],
+)
+
+
 val_dataloader = dict(
-    batch_size=32,
-    num_workers=2,
+    batch_size=val_batch_size,
+    num_workers=5,
     persistent_workers=True,
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=False, round_up=False),
     dataset=dict(
-        type=dataset_type,
-        data_root=data_root,
-        data_mode=data_mode,
-        ann_file='annotations/person_keypoints_val2017.json',
-        bbox_file='data/coco/person_detection_results/'
-        'COCO_val2017_detections_AP_H_56_person.json',
-        data_prefix=dict(img='val2017/'),
-        test_mode=True,
+        type='CombinedDataset',
+        metainfo=dict(from_file='configs/_base_/datasets/coco.py'),
+        datasets=[
+            val_halpe,
+        ],
         pipeline=val_pipeline,
+        test_mode=True,
     ))
+
 test_dataloader = val_dataloader
 
+# hooks
+default_hooks = dict(
+    checkpoint=dict(save_best='AUC', rule='greater', max_keep_ckpts=1))
+
+# custom_hooks = [
+#     # dict(
+#     #     type='EMAHook',
+#     #     ema_type='ExpMomentumEMA',
+#     #     momentum=0.0002,
+#     #     update_buffers=True,
+#     #     priority=49),
+#     dict(
+#         type='mmdet.PipelineSwitchHook',
+#         switch_epoch=max_epochs - stage2_num_epochs,
+#         switch_pipeline=train_pipeline_stage2)
+# ]
+
 # evaluators
-val_evaluator = dict(
-    type='CocoMetric',
-    ann_file=data_root + 'annotations/person_keypoints_val2017.json')
-test_evaluator = val_evaluator
+test_evaluator = [dict(type='PCKAccuracy', thr=0.1), dict(type='AUC')]
+val_evaluator = test_evaluator
