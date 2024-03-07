@@ -168,12 +168,7 @@ dataset_halpe = dict(
     data_mode=data_mode,
     ann_file='annotations.json',
     data_prefix=dict(img='img/'),
-    pipeline=[
-        dict(
-            type='KeypointConverter',
-            num_keypoints=num_keypoints,
-            mapping=halpe_halpe26)
-    ],
+
 )
 
 
@@ -201,12 +196,7 @@ val_halpe = dict(
     data_mode=data_mode,
     ann_file='annotations.json',
     data_prefix=dict(img='img/'),
-    pipeline=[
-        dict(
-            type='KeypointConverter',
-            num_keypoints=num_keypoints,
-            mapping=halpe_halpe26)
-    ],
+
 )
 
 
