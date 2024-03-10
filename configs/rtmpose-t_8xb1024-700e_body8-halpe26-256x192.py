@@ -105,33 +105,34 @@ backend_args = dict(backend='local')
 train_pipeline = [
     dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
-    # dict(type='RandomFlip', direction='horizontal'),
+    dict(type='RandomFlip', direction='horizontal'),
     # dict(type='RandomHalfBody'),
-    # dict(
-    #     type='RandomBBoxTransform',
-    #     scale_factor=[1, 1.5],
-    #     rotate_factor=30,
-    #     shift_factor=0.,
-    #     # shift_prob=0,
-    #     # scale_prob=0,
-    # ),
+    dict(
+        type='RandomBBoxTransform',
+        scale_factor=[1, 1.2],
+        rotate_factor=5,
+        shift_factor=0.1,
+        # shift_prob=0,
+        # scale_prob=0,
+    ),
     dict(type='TopdownAffine', input_size=codec['input_size']),
-    # dict(type='PhotometricDistortion'),
-    # dict(
-    #     type='Albumentation',
-    #     transforms=[
-    #         dict(type='Blur', p=0.1),
-    #         dict(type='MedianBlur', p=0.1),
-    #         # dict(
-    #         #     type='CoarseDropout',
-    #         #     max_holes=1,
-    #         #     max_height=0.4,
-    #         #     max_width=0.4,
-    #         #     min_holes=1,
-    #         #     min_height=0.2,
-    #         #     min_width=0.2,
-    #         #     p=1.0),
-    #     ]),
+    dict(type='PhotometricDistortion'),
+    dict(
+        type='Albumentation',
+        transforms=[
+            dict(type='MotionBlur', p=0.5),
+            # dict(type='MedianBlur', p=0.1),
+            dict(type="ColorJitter", p=0.5)
+            # dict(
+            #     type='CoarseDropout',
+            #     max_holes=1,
+            #     max_height=0.4,
+            #     max_width=0.4,
+            #     min_holes=1,
+            #     min_height=0.2,
+            #     min_width=0.2,
+            #     p=1.0),
+        ]),
     dict(
         type='GenerateTarget',
         encoder=codec,
