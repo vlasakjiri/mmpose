@@ -6,36 +6,44 @@ num_keypoints = 26
 input_size = (192, 256)
 
 # runtime
-max_epochs = 700
-stage2_num_epochs = 30
-base_lr = 4e-3
-train_batch_size = 1024
-val_batch_size = 64
+max_epochs = 150
+base_lr = 5e-4
+train_batch_size = 64
+val_batch_size = 8
 
-train_cfg = dict(max_epochs=max_epochs, val_interval=1)
+train_cfg = dict(max_epochs=max_epochs, val_interval=10)
 randomness = dict(seed=21)
 
 load_from = "https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/rtmpose-t_simcc-body7_pt-body7-halpe26_700e-256x192-6020f8a6_20230605.pth"
 
-
+visualizer = dict(vis_backends=[
+    dict(type='LocalVisBackend'),
+    dict(type='TensorboardVisBackend'),
+])
 # optimizer
-optim_wrapper = dict(optimizer=dict(
-    type='Adam',
-    lr=5e-4,
-))
+optim_wrapper = dict(
+    type='OptimWrapper',
+    optimizer=dict(type='AdamW', lr=base_lr, weight_decay=0.05),
+    clip_grad=dict(max_norm=35, norm_type=2),
+    paramwise_cfg=dict(
+        norm_decay_mult=0, bias_decay_mult=0, bypass_duplicate=True, 
+        # custom_keys={'backbone': dict(lr_mult=0)}
+        ))
+
 
 # learning policy
 param_scheduler = [
+    # dict(
+    #     type='LinearLR', begin=0, end=5, start_factor=0.001,
+    #     by_epoch=True),  # warm-up
     dict(
-        type='LinearLR', begin=0, end=500, start_factor=0.001,
-        by_epoch=False),  # warm-up
-    dict(
-        type='MultiStepLR',
-        begin=0,
-        end=train_cfg['max_epochs'],
-        milestones=[170, 200],
-        gamma=0.1,
-        by_epoch=True)
+        type='CosineAnnealingLR',
+        eta_min=base_lr * 0.05,
+        begin=max_epochs // 2,
+        end=max_epochs,
+        T_max=max_epochs // 2,
+        by_epoch=True,
+        convert_to_iter_based=True)
 ]
 
 # automatically scaling LR based on the actual training batch size
@@ -154,12 +162,14 @@ halpe_halpe26 = [(i, i) for i in range(26)]
 # base dataset settings
 dataset_type = 'CocoWholeBodyDataset'
 data_mode = 'topdown'
-data_root = 'dataset/'
+data_root_train = 'data/train'
+data_root_val = 'data/val'
+
 
 # train datasets
 dataset_halpe = dict(
     type='HalpeDataset',
-    data_root=data_root,
+    data_root=data_root_train,
     data_mode=data_mode,
     ann_file='annotations.json',
     data_prefix=dict(img='img/'),
@@ -187,7 +197,7 @@ train_dataloader = dict(
 # val datasets
 val_halpe = dict(
     type='HalpeDataset',
-    data_root=data_root,
+    data_root=data_root_val,
     data_mode=data_mode,
     ann_file='annotations.json',
     data_prefix=dict(img='img/'),
