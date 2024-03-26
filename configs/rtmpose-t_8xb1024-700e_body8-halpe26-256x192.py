@@ -6,12 +6,12 @@ num_keypoints = 26
 input_size = (192, 256)
 
 # runtime
-max_epochs = 150
+max_epochs = 10
 base_lr = 5e-4
 train_batch_size = 64
 val_batch_size = 8
 
-train_cfg = dict(max_epochs=max_epochs, val_interval=10)
+train_cfg = dict(max_epochs=max_epochs, val_interval=1)
 randomness = dict(seed=21)
 
 load_from = "https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/rtmpose-t_simcc-body7_pt-body7-halpe26_700e-256x192-6020f8a6_20230605.pth"
@@ -124,14 +124,15 @@ train_pipeline = [
         # scale_prob=0,
     ),
     dict(type='TopdownAffine', input_size=codec['input_size']),
-    dict(type='PhotometricDistortion'),
+    # dict(type='PhotometricDistortion'),
     dict(
         type='Albumentation',
         transforms=[
             dict(type='MotionBlur', p=0.5),
             # dict(type='MedianBlur', p=0.1),
-            dict(type="ColorJitter", p=0.5)
-            # dict(
+            dict(type="ColorJitter", p=0.5),
+            dict(type="Perspective", always_apply=False, p=1.0, scale=(0.05, 0.1), keep_size=0, pad_mode=0, pad_val=(0, 0, 0), mask_pad_val=0, fit_output=0, interpolation=0)
+            # dict
             #     type='CoarseDropout',
             #     max_holes=1,
             #     max_height=0.4,
