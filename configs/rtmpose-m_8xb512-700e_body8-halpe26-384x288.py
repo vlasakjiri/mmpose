@@ -2,20 +2,22 @@ _base_ = ['./_base_/default_runtime.py']
 
 # common setting
 num_keypoints = 26
-input_size = (192, 256)
+input_size = (288, 384)
+
 
 # runtime
-max_epochs = 5
+max_epochs = 7
 base_lr = 5e-4
 train_batch_size = 16
-val_batch_size = 16
+val_batch_size = 128
 
 train_cfg = dict(by_epoch=False, max_iters=130, val_interval=10)
+
 randomness = dict(seed=21)
 
-# optimizer_config = dict(type="GradientCumulativeOptimizerHook", cumulative_iters=8)
+# optimizer_config = dict(type="GradientCumulativeOptimizerHook", cumulative_iters=10)
 
-load_from = "https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/rtmpose-l_simcc-body7_pt-body7-halpe26_700e-256x192-2abb7558_20230605.pth"
+load_from = "https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-384x288-89e6428b_20230605.pth"
 
 # optimizer
 optim_wrapper = dict(
@@ -26,22 +28,22 @@ optim_wrapper = dict(
         bias_decay_mult=0, bypass_duplicate=True, norm_decay_mult=0))
 
 # learning rate
-# param_scheduler = [
-#     dict(
-#         type='LinearLR',
-#         start_factor=1.0e-5,
-#         by_epoch=False,
-#         begin=0,
-#         end=1000),
-#     dict(
-#         type='CosineAnnealingLR',
-#         eta_min=base_lr * 0.05,
-#         begin=max_epochs // 2,
-#         end=max_epochs,
-#         T_max=max_epochs // 2,
-#         by_epoch=True,
-#         convert_to_iter_based=True),
-# ]
+param_scheduler = [
+    # dict(
+    #     type='LinearLR',
+    #     start_factor=1.0e-5,
+    #     by_epoch=False,
+    #     begin=0,
+    #     end=10),
+    # dict(
+    #     type='CosineAnnealingLR',
+    #     eta_min=base_lr * 0.05,
+    #     begin=0,
+    #     end=max_epochs,
+    #     T_max=max_epochs // 2,
+    #     by_epoch=True,
+    #     convert_to_iter_based=True),
+]
 
 # automatically scaling LR based on the actual training batch size
 auto_scale_lr = dict(base_batch_size=1024)
@@ -49,11 +51,13 @@ auto_scale_lr = dict(base_batch_size=1024)
 # codec settings
 codec = dict(
     type='SimCCLabel',
-    input_size=input_size,
-    sigma=(4.9, 5.66),
+    input_size=(288, 384),
+    sigma=(6., 6.93),
     simcc_split_ratio=2.0,
     normalize=False,
     use_dark=False)
+
+# model settings
 
 # model settings
 model = dict(
@@ -68,20 +72,15 @@ model = dict(
         type='CSPNeXt',
         arch='P5',
         expand_ratio=0.5,
-        deepen_factor=1.,
-        widen_factor=1.,
+        deepen_factor=0.67,
+        widen_factor=0.75,
         out_indices=(4, ),
         channel_attention=True,
         norm_cfg=dict(type='SyncBN'),
-        act_cfg=dict(type='SiLU'),
-        init_cfg=dict(
-            type='Pretrained',
-            prefix='backbone.',
-            checkpoint="https://download.openmmlab.com/mmpose/v1/projects/rtmposev1/rtmpose-l_simcc-body7_pt-body7-halpe26_700e-256x192-2abb7558_20230605.pth"  # noqa
-        )),
+        act_cfg=dict(type='SiLU'),),
     head=dict(
         type='RTMCCHead',
-        in_channels=1024,
+        in_channels=768,
         out_channels=num_keypoints,
         input_size=input_size,
         in_featuremap_size=tuple([s // 32 for s in input_size]),
@@ -104,6 +103,8 @@ model = dict(
         decoder=codec),
     test_cfg=dict(flip_test=True))
 
+
+
 backend_args = dict(backend='local')
 
 # pipelines
@@ -111,12 +112,11 @@ train_pipeline = [
     dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
     dict(type='RandomFlip', direction='horizontal'),
-    # dict(type='RandomHalfBody'),
     dict(
         rotate_factor=5,
         scale_factor=[
-            1,
-            1.2,
+            0.95,
+            1.05,
         ],
         shift_factor=0.1,
         type='RandomBBoxTransform'),
@@ -147,12 +147,12 @@ halpe_halpe26 = [(i, i) for i in range(26)]
 
 
 
-
 # base dataset settings
 dataset_type = 'CocoWholeBodyDataset'
 data_mode = 'topdown'
 data_root_train = 'data/train'
 data_root_val = 'data/val'
+
 
 # train datasets
 dataset_halpe = dict(
@@ -213,7 +213,7 @@ test_dataloader = val_dataloader
 
 # hooks
 default_hooks = dict(
-    checkpoint=dict(save_best='AUC', rule='greater', max_keep_ckpts=5, by_epoch=False, interval=10),  logger=dict(type='LoggerHook', interval=1),)
+    checkpoint=dict(save_best='NME', rule='less', max_keep_ckpts=5, by_epoch=False, interval=10),  logger=dict(type='LoggerHook', interval=1),)
 
 custom_hooks = [
     dict(
