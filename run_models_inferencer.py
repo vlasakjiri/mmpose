@@ -17,7 +17,7 @@ models = [
     ("rtmpose-m_8xb512-700e_body8-halpe26-256x192",
      r"work_dirs\rtmpose-m_8xb512-700e_body8-halpe26-256x192\best_NME_iter_120.pth"),
 
-     (r"configs\rtmpose-l_8xb512-700e_body8-halpe26-256x192.py",
+     (r"rtmpose-l_8xb512-700e_body8-halpe26-256x192",
       r"work_dirs\rtmpose-l_8xb512-700e_body8-halpe26-256x192\best_AUC_iter_90.pth"),
 
       ("rtmpose-m_8xb512-700e_body8-halpe26-384x288",
